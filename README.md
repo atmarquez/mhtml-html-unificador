@@ -79,6 +79,7 @@ flowchart TD
     G --> H[Guardar capítulo]
     H --> I[Reescribir enlaces]
     I --> J[Generar unido.html]
+```
 
 ## Licencia
 
