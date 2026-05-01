@@ -1,7 +1,7 @@
 
 [project]
 name = "mhtml-html-unificador"
-version = "1.0.0"
+version = "1.0.1"
 description = "Unifica múltiples archivos MHTML en un único HTML autocontenido"
 readme = "README.md"
 license = { text = "GPL-3.0-or-later" }
