@@ -30,9 +30,17 @@
 from pathlib import Path
 from email import policy
 from email.parser import BytesParser
+from datetime import datetime
 import base64
 import re
+import mimetypes
+import argparse
+import sys
+
+
 from urllib.parse import urlparse
+from urllib.request import urlopen
+from urllib.error import URLError
 
 # =============================================================================
 # METADATA
@@ -40,10 +48,9 @@ from urllib.parse import urlparse
 
 __author__ = "Antonio Teodomiro Márquez Muñoz (Naidel)"
 __email__ = "atmarquez@gmail.com"
-__version__ = "1.0.1"
+__version__ = "1.1.0"
 __license__ = "GPL-3.0-or-later"
 __donate__ = "https://paypal.me/atmarquez"
-
 
 # =============================================================================
 # CONFIGURACIÓN GLOBAL
@@ -51,12 +58,143 @@ __donate__ = "https://paypal.me/atmarquez"
 
 # Extensiones de imagen soportadas para incrustación directa
 IMG_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
+HTML_EXTS = {".html", ".htm", ".xhtml"}
+MHTML_EXTS = {".mhtml"}
 
+# =============================================================================
+# ARGUMENTOS DE LÍNEA DE COMANDOS
+# =============================================================================
+
+parser = argparse.ArgumentParser(
+    prog="unificador_mhtml.py",
+    description=(
+        "Unificador de documentos HTML, MHTML e imágenes en un único "
+        "archivo HTML autocontenido.\n\n"
+        "El programa recorre el directorio actual y:\n"
+        "  • Une ficheros HTML, HTM, XHTML y MHTML\n"
+        "  • Incrusta imágenes locales y remotas como Base64\n"
+        "  • Evita duplicados y auto-inclusión del HTML generado\n"
+        "  • Genera un único HTML listo para navegación, impresión o PDF"
+    ),
+    epilog=(
+        "Ejemplos de uso:\n"
+        "  python unificador_mhtml.py\n"
+        "  python unificador_mhtml.py -o libro.html -t \"Manual ISACA CRISC\"\n"
+        "  python unificador_mhtml.py --no-filenames\n"
+        "  python unificador_mhtml.py --version\n\n"
+        "Autor: Antonio Teodomiro Márquez Muñoz (Naidel)\n"
+        "Donaciones: https://paypal.me/atmarquez"
+    ),
+    formatter_class=argparse.RawTextHelpFormatter
+)
+
+parser.add_argument(
+    "-o", "--output",
+    default="unido.html",
+    help='Nombre del fichero HTML de salida (por defecto: unido.html)'
+)
+
+parser.add_argument(
+    "-t", "--title",
+    default="Manual unificado",
+    help='Título principal del documento (por defecto: "Manual unificado")'
+)
+
+parser.add_argument(
+    "--no-filenames",
+    action="store_true",
+    help="No mostrar el nombre del fichero antes de cada parte unificada"
+)
+
+parser.add_argument(
+    "-V", "--version",
+    action="store_true",
+    help="Mostrar información del programa y salir"
+)
+
+args = parser.parse_args()
+
+if args.version:
+    print(
+        "unificador_mhtml.py\n"
+        f"  Versión:   {__version__}\n"
+        f"  Autor:     {__author__}\n"
+        f"  Email:     {__email__}\n"
+        f"  Licencia:  {__license__}\n"
+        f"  Donar:     {__donate__}"
+    )
+    sys.exit(0)
 
 # =============================================================================
 # FUNCIONES AUXILIARES
 # =============================================================================
 
+def es_html_generado_por_unificador(path):
+    """
+    Detecta si un HTML ha sido generado por unificador_mhtml.py.
+    """
+    try:
+        texto = path.read_text(encoding="utf-8", errors="ignore")
+        if (
+            "GENERATED-BY: unificador_mhtml.py" in texto
+            or 'name="generator" content="unificador_mhtml.py"' in texto
+        ):
+            return True
+    except Exception:
+        pass
+    return False
+
+def incrustar_imagenes_externas(html, base_path):
+    """
+    Descarga o lee imágenes referenciadas por URL o ruta local en el HTML
+    y las convierte en data URLs embebidas.
+    """
+
+    def reemplazo(match):
+        prefijo = match.group(1)
+        comilla = match.group(2)
+        url = match.group(3).strip()
+
+        # Ignorar data URLs y CID
+        if url.startswith(("data:", "cid:")):
+            return match.group(0)
+
+        try:
+            # --- IMÁGENES REMOTAS ---
+            if url.startswith(("http://", "https://")):
+                from urllib.request import urlopen
+                with urlopen(url) as resp:
+                    data = resp.read()
+                    mime = resp.headers.get_content_type()
+
+            # --- FILE:// ---
+            elif url.startswith("file://"):
+                ruta = Path(url[7:])
+                data = ruta.read_bytes()
+                mime, _ = mimetypes.guess_type(ruta)
+
+            # --- RUTAS LOCALES RELATIVAS / ABSOLUTAS ---
+            else:
+                ruta = (base_path.parent / url).resolve()
+                data = ruta.read_bytes()
+                mime, _ = mimetypes.guess_type(ruta)
+
+            if not data or not mime or not mime.startswith("image/"):
+                raise ValueError("No es una imagen válida")
+
+            b64 = base64.b64encode(data).decode("ascii")
+            return f'{prefijo}{comilla}data:{mime};base64,{b64}{comilla}'
+
+        except Exception as e:
+            print(f"⚠️  No se pudo incrustar imagen: {url} ({e})")
+            return match.group(0)
+
+    return re.sub(
+        r'(?i)(<img[^>]+src=)(["\'])([^"\']+)\2',
+        reemplazo,
+        html
+    )
+    
 def extraer_recursos(msg):
     """
     Extrae imágenes embebidas desde un mensaje MHTML y las convierte en data URL.
@@ -254,7 +392,9 @@ def prefijar_ids(html, prefijo, anchor_map):
 archivos = sorted(
     (
         p for p in Path(".").iterdir()
-        if p.suffix.lower() == ".mhtml" or p.suffix.lower() in IMG_EXTS
+        if p.suffix.lower() in IMG_EXTS
+        or p.suffix.lower() in HTML_EXTS
+        or p.suffix.lower() in MHTML_EXTS
     ),
     key=lambda p: p.name.lower()
 )
@@ -266,42 +406,76 @@ print("Extrayendo documentos, imágenes, CSS y anclas...")
 
 for archivo in archivos:
 
-    # Procesamiento de imágenes sueltas
-    if archivo.suffix.lower() in IMG_EXTS:
+    sufijo = archivo.suffix.lower()
+
+    # -------------------------------------------------
+    # IMÁGENES SUELTAS
+    # -------------------------------------------------
+    if sufijo in IMG_EXTS:
         capitulos.append((archivo.stem, imagen_a_html(archivo)))
         continue
 
-    # Procesamiento de archivos MHTML
-    with archivo.open("rb") as fd:
-        msg = BytesParser(policy=policy.default).parse(fd)
+    # -------------------------------------------------
+    # HTML / HTM / XHTML
+    # -------------------------------------------------
+    if sufijo in HTML_EXTS:
 
-    recursos = extraer_recursos(msg)
-    css_embebido = extraer_css(msg)
-    html_final = ""
-
-    for part in msg.walk():
-        if part.is_multipart() or not es_html(part):
+        if es_html_generado_por_unificador(archivo):
+            print(
+                f"⏭️ {archivo.name} no se agregó: "
+                "HTML generado previamente por unificador_mhtml.py"
+            )
             continue
 
-        payload = part.get_payload(decode=True)
-        if not payload:
-            continue
+        print(f"Procesando HTML: {archivo.name}")
 
-        charset = part.get_content_charset() or "utf-8"
-        html = payload.decode(charset, errors="replace")
-
-        # Sustituir CID por data URLs
-        for cid, data in recursos.items():
-            html = html.replace(cid, data)
+        html = archivo.read_text(encoding="utf-8", errors="replace")
 
         html = limpiar_html(html)
         html = eliminar_base(html)
+        html = incrustar_imagenes_externas(html, archivo)
         html = prefijar_ids(html, archivo.stem, anchor_map)
 
-        html_final = css_embebido + "\n" + html
-        break
+        capitulos.append((archivo.stem, html))
+        continue
 
-    capitulos.append((archivo.stem, html_final))
+    # -------------------------------------------------
+    # MHTML
+    # -------------------------------------------------
+    if sufijo in MHTML_EXTS:
+        print(f"Procesando MHTML: {archivo.name}")
+
+        with archivo.open("rb") as fd:
+            msg = BytesParser(policy=policy.default).parse(fd)
+
+        recursos = extraer_recursos(msg)
+        css_embebido = extraer_css(msg)
+        html_final = ""
+
+        for part in msg.walk():
+            if part.is_multipart() or not es_html(part):
+                continue
+
+            payload = part.get_payload(decode=True)
+            if not payload:
+                continue
+
+            charset = part.get_content_charset() or "utf-8"
+            html = payload.decode(charset, errors="replace")
+
+            # Sustituir CID por data URLs
+            for cid, data in recursos.items():
+                html = html.replace(cid, data)
+
+            html = limpiar_html(html)
+            html = eliminar_base(html)
+            html = incrustar_imagenes_externas(html, archivo)
+            html = prefijar_ids(html, archivo.stem, anchor_map)
+
+            html_final = css_embebido + "\n" + html
+            break
+
+        capitulos.append((archivo.stem, html_final))
 
 
 # =============================================================================
@@ -348,24 +522,103 @@ def reescribir_links(html):
 # GENERACIÓN DEL HTML FINAL
 # =============================================================================
 
-with open("unido.html", "w", encoding="utf-8") as salida:
+with open(args.output, "w", encoding="utf-8") as salida:
+    fecha = datetime.now().isoformat(timespec="seconds")
     salida.write(
         "<!DOCTYPE html>\n"
         "<html lang=\"es\">\n<head>\n"
         "<meta charset=\"utf-8\">\n"
-        "<title>Manual unificado</title>\n"
-        "<style>/* estilos generales y de impresión */</style>\n"
+        "<!-- GENERATED-BY: unificador_mhtml.py -->\n"
+        f"<meta name=\"generator\" content=\"unificador_mhtml.py\">\n"
+        f"<meta name=\"generator-version\" content=\"{__version__}\">\n"
+        f"<meta name=\"generator-author\" content=\"{__author__}\">\n"
+        f"<meta name=\"generator-email\" content=\"{__email__}\">\n"
+        f"<meta name=\"generator-donate\" content=\"{__donate__}\">\n"
+        f"<meta name=\"generator-date\" content=\"{fecha}\">\n"
+        f"<title>{args.title}</title>\n"
+        "<style>\n"
+        "/* ================================ */\n"
+        "/*  ESTILOS DE VISUALIZACIÓN WEB    */\n"
+        "/* ================================ */\n"
+        "\n"
+        "@media screen {\n"
+        "  body {\n"
+        "    max-width: 900px;\n"
+        "    margin: auto;\n"
+        "  }\n"
+        "}\n"
+        "\n"
+        "/* Título principal centrado */\n"
+        "h1 {\n"
+        "  text-align: center;\n"
+        "  margin-top: 2rem;\n"
+        "  margin-bottom: 3rem;\n"
+        "}\n"      
+        "\n"
+        "section.capitulo {\n"
+        "  margin-top: 4rem;\n"
+        "  padding-top: 2rem;\n"
+        "  border-top: 1px solid #ddd;\n"
+        "}\n"
+        "\n"
+        "section.capitulo:first-of-type {\n"
+        "  margin-top: 2rem;\n"
+        "  padding-top: 0;\n"
+        "  border-top: none;\n"
+        "}\n"
+        "\n"
+        "section.capitulo > h2 {\n"
+        "  margin-top: 0;\n"
+        "  margin-bottom: 1.5rem;\n"    
+        "}\n"
+        "/* ================================ */\n"
+        "/*  ESTILOS DE IMPRESIÓN            */\n"
+        "/* ================================ */\n"
+        "\n"
+        "@media print {\n"
+        "\n"
+        "body {\n"
+        "    margin: 0;\n"
+        "}\n"       
+        "\n"
+        "  /* Cada capítulo comienza en página nueva */\n"
+        "  section.capitulo {\n"
+        "    break-before: page;\n"
+        "    page-break-before: always;\n"
+        "    max-width: 100%;\n"
+        "  }\n"
+        "\n"
+        "  /* El primer capítulo no fuerza página nueva */\n"
+        "  section.capitulo:first-of-type {\n"
+        "    break-before: auto;\n"
+        "    page-break-before: auto;\n"
+        "  }\n"
+        "\n"
+        "  /* Evitar que títulos queden al final de página */\n"
+        "  h1, h2 {\n"
+        "    break-after: avoid;\n"
+        "    page-break-after: avoid;\n"
+        "  }\n"
+        "\n"
+        "  /* Evitar saltos dentro de figuras (imágenes, gráficos) */\n"
+        "  figure {\n"
+        "    break-inside: avoid;\n"
+        "    page-break-inside: avoid;\n"
+        "  }\n"
+        "}\n"
+        "</style>\n"
         "</head>\n<body>\n"
-        "<h1>Manual unificado</h1>\n"
+        f"<h1>{args.title}</h1>\n"
     )
 
     for titulo, html in capitulos:
         html = reescribir_links(html)
-        salida.write(
-            f'<section class="capitulo" id="{titulo}">'
-            f'<h2>{titulo}</h2>{html}</section>\n'
-        )
+        
+        salida.write(f'<section class="capitulo" id="{titulo}">')
+        if not args.no_filenames:
+            salida.write(f'<h2>{titulo}</h2>')
+        salida.write(f'{html}</section>\n')
 
     salida.write("</body></html>")
 
-print("✅ unido.html creado correctamente")
+print(f"✅ {args.output} creado correctamente")

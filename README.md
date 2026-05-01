@@ -1,15 +1,15 @@
-# Unificador MHTML a HTML by Naidel
+# Unificador MHTML a HTML
 
 ![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)
 ![License](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)
 ![Status](https://img.shields.io/badge/Status-Stable-success.svg)
-![Platform](https://img.shields.io/badge/Platform-Cross--platform-lightgrey.svg)
+![Platform](https://img.shields.io/badge/Platform-Cross--platform-lightgrey.svg
 ![GitHub repo size](https://img.shields.io/github/repo-size/atmarquez/mhtml-html-unificador)
 ![GitHub last commit](https://img.shields.io/github/last-commit/atmarquez/mhtml-html-unificador)
 
-Convierte múltiples archivos **.mhtml** e imágenes en un único documento
-**HTML autocontenido**, listo para archivo o impresión.
-Ideal para unificar páginas web en un unico fichero.
+Unificador de documentos HTML, MHTML e imágenes en un único archivo HTML
+**totalmente autocontenido**, listo para navegación offline, impresión o
+exportación a PDF. Ideal para unificar páginas web en un unico fichero.
 
 ---
 
@@ -20,24 +20,74 @@ Ideal para unificar páginas web en un unico fichero.
 
 ---
 
-## Características
+## ✨ Características principales
 
-- Convierte imágenes CID a data-URL
-- Incrusta CSS embebido
-- Evita colisiones de anclas (`id`, `name`)
-- Reescribe enlaces internos
-- Optimizado para impresión
+- Une documentos:
+  - `.html`, `.htm`, `.xhtml`
+  - `.mhtml`
+- Incrusta:
+  - imágenes embebidas (CID)
+  - imágenes locales
+  - imágenes remotas (http/https)
+  - imágenes sueltas del directorio
+- HTML final 100 % autocontenido (Base64)
+- Evita auto-inclusión del HTML generado
+- Reescribe anclas y enlaces internos
+- Evita colisiones de IDs
+- Optimizado para impresión:
+  - salto de página por documento
+  - evita títulos huérfanos
+  - evita figuras partidas
+- Configurable por línea de comandos
 
-## Uso
+## 📂 Funcionamiento
 
-1. Coloca los archivos `.mhtml` y/o imágenes en el directorio de trabajo.
-2. Ejecuta:
+El programa recorre el **directorio actual** y procesa:
+
+- Imágenes sueltas → páginas HTML embebidas
+- Documentos HTML/MHTML → contenidos normalizados e integrados
+
+Todo se unifica en **un único fichero HTML**.
+
+
+## 🚀 Uso
 
 ```bash
-python src/unificador_mhtml.py
+python unificador_mhtml.py
 ```
 
-3. Se generará el archivo `unido.html`.
+## ⚙️ Opciones de línea de comandos
+
+```
+-o, --output        Nombre del fichero HTML de salida
+-t, --title         Título principal del documento
+--no-filenames      No mostrar el nombre del fichero antes de cada parte
+-V, --version       Mostrar información del programa y salir
+-h, --help          Mostrar esta ayuda
+```
+
+## Ejemplos
+
+```
+# Uso por defecto
+python unificador_mhtml.py
+
+# Cambiar nombre y título
+python unificador_mhtml.py -o libro.html -t "Manual ISACA CRISC"
+
+# Sin mostrar nombres de fichero
+python unificador_mhtml.py --no-filenames
+```
+
+## 🖨️ Impresión
+
+El HTML generado está preparado para impresión profesional:
+
+Cada documento comienza en página nueva
+Títulos nunca quedan al final de página
+Figuras no se dividen entre páginas
+
+Los márgenes y layout finales pueden ajustarse editando el HTML generado.
 
 ## Requisitos
 
