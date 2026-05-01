@@ -9,7 +9,7 @@
 # Email: atmarquez@gmail.com
 # Donate: https://paypal.me/atmarquez  # con PayPal
 #
-# Version: 1.0.0
+# Version: 1.0.1
 # Copyright (C) 2026 Antonio Teodomiro Márquez Muñoz (Naidel)
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
@@ -40,7 +40,7 @@ from urllib.parse import urlparse
 
 __author__ = "Antonio Teodomiro Márquez Muñoz (Naidel)"
 __email__ = "atmarquez@gmail.com"
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 __license__ = "GPL-3.0-or-later"
 __donate__ = "https://paypal.me/atmarquez"
 
