@@ -1,0 +1,12 @@
+
+[project]
+name = "mhtml-html-unificador"
+version = "1.0.0"
+description = "Unifica múltiples archivos MHTML en un único HTML autocontenido"
+readme = "README.md"
+license = { text = "GPL-3.0-or-later" }
+requires-python = ">=3.9"
+
+authors = [
+  { name = "Antonio Teodomiro Márquez Muñoz (Naidel)" }
+]
