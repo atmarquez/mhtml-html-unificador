@@ -42,7 +42,7 @@ __author__ = "Antonio Teodomiro Márquez Muñoz (Naidel)"
 __email__ = "atmarquez@gmail.com"
 __version__ = "1.0.0"
 __license__ = "GPL-3.0-or-later"
-__donate__ = https://paypal.me/atmarquez
+__donate__ = "https://paypal.me/atmarquez"
 
 
 # =============================================================================
