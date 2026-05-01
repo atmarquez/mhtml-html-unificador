@@ -3,7 +3,7 @@
 ![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)
 ![License](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)
 ![Status](https://img.shields.io/badge/Status-Stable-success.svg)
-![Platform](https://img.shields.io/badge/Platform-Cross--platform-lightgrey.svg
+![Platform](https://img.shields.io/badge/Platform-Cross--platform-lightgrey.svg)
 ![GitHub repo size](https://img.shields.io/github/repo-size/atmarquez/mhtml-html-unificador)
 ![GitHub last commit](https://img.shields.io/github/last-commit/atmarquez/mhtml-html-unificador)
 
